@@ -5,10 +5,41 @@ import (
 	"fmt"
 	"html/template"
 	"net/smtp"
+	"strings"
 
 	"github.com/nodus-protocol/backend/internal/config"
 	"go.uber.org/zap"
 )
+
+// disposableDomains is a curated list of known throwaway email providers.
+var disposableDomains = map[string]struct{}{
+	"mailinator.com":    {},
+	"guerrillamail.com": {},
+	"tempmail.com":      {},
+	"10minutemail.com":  {},
+	"trashmail.com":     {},
+	"fakeinbox.com":     {},
+	"yopmail.com":       {},
+	"throwam.com":       {},
+	"sharklasers.com":   {},
+	"dispostable.com":   {},
+}
+
+// IsDisposableEmail returns true if the email's domain is a known
+// disposable mail provider.
+func IsDisposableEmail(email string) bool {
+	parts := strings.SplitN(strings.ToLower(email), "@", 2)
+	if len(parts) != 2 {
+		return false
+	}
+	_, blocked := disposableDomains[parts[1]]
+	return blocked
+}
+
+// NormalizeEmail lowercases and trims whitespace from an email address.
+func NormalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
 
 // Mailer sends transactional emails.
 type Mailer struct {
