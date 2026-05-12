@@ -54,6 +54,12 @@ services:
       DB_NAME: nodus_protocol
       REDIS_URL: redis://redis:6379
       SERVER_PORT: 8080
+      # Stellar / Soroban
+      SOROBAN_RPC_URL: https://soroban-testnet.stellar.org
+      POOL_CONTRACT_ID: ""
+      POOL_TOKEN_0: XLM
+      POOL_TOKEN_1: USDC
+      STELLAR_NETWORK: testnet
     ports:
       - "8080:8080"
     healthcheck:
