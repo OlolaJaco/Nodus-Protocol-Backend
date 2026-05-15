@@ -1,0 +1,27 @@
+# Nodus Protocol Backend
+
+# Binaries
+/bin/
+*.exe
+
+# Secrets — NEVER commit these
+.env
+certs/
+
+# Go toolchain
+vendor/
+*.test
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Swagger generated output
+/docs/swagger.json
+/docs/swagger.yaml
+/docs/docs.go
