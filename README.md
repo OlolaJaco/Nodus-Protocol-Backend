@@ -60,6 +60,22 @@ The API will be available at `http://localhost:8080`.
 | PUT  | `/api/v1/users/me/password` | Bearer | Change password |
 | DELETE | `/api/v1/users/me` | Bearer | Delete account |
 
+## Protocol Endpoints
+
+These endpoints power the off-chain indexer for the Nodus Protocol AMM. Pool events emitted by the on-chain contracts (Mint, Burn, Swap, Sync) are indexed and served here.
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api/v1/pools` | Public | List all active liquidity pools |
+| GET | `/api/v1/pools/:id` | Public | Get pool by contract address |
+| GET | `/api/v1/pools/:id/volume` | Public | 24h / 7d swap volume for a pool |
+| GET | `/api/v1/pools/:id/tvl` | Public | Current total value locked |
+| GET | `/api/v1/pools/:id/swaps` | Public | Paginated swap history |
+| GET | `/api/v1/pools/:id/positions` | Bearer | LP positions for the authenticated user |
+| GET | `/api/v1/stats` | Public | Protocol-wide TVL, volume, and fee totals |
+| GET | `/api/v1/tokens` | Public | Supported PSP22 token list with metadata |
+| GET | `/api/v1/price/:token` | Public | Latest and TWAP price for a token |
+
 ## Health Check
 ```
 GET /health
