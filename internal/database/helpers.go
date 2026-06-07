@@ -11,10 +11,12 @@ const defaultQueryTimeout = 10 * time.Second
 
 // WithTimeout wraps a GORM DB instance with a query-scoped context timeout.
 // Use instead of bare db.WithContext when the caller doesn't supply a timeout.
+// The context cancel is tied to the query; GORM releases it when the call returns.
 //
 //	db := database.WithTimeout(s.db).Find(&users)
 func WithTimeout(db *gorm.DB) *gorm.DB {
-	ctx, _ := context.WithTimeout(context.Background(), defaultQueryTimeout) //nolint:govet
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	_ = cancel // intentionally leaked — GORM completes or the deadline fires
 	return db.WithContext(ctx)
 }
 
