@@ -16,9 +16,11 @@ func RegisterRoutes(rg *gin.RouterGroup, h *Handler, jwtManager *utils.JWTManage
 	p.GET("/lp-balance",    h.GetLPBalance)
 	p.GET("/stats",         h.GetStats)
 	p.GET("/snapshots",     h.GetSnapshots)
-	p.GET("/tvl",           h.GetTVL)
-	p.GET("/price-history", h.GetPriceHistory)
-	p.GET("/overview",      h.GetOverview)
+	p.GET("/reverse-quote",              h.ReverseQuote)
+	p.GET("/simulate/add-liquidity",     h.SimulateAddLiquidity)
+	p.GET("/tvl",                        h.GetTVL)
+	p.GET("/price-history",              h.GetPriceHistory)
+	p.GET("/overview",                   h.GetOverview)
 
 	// Protected — transaction building requires auth so we can log user context
 	protected := p.Group("")

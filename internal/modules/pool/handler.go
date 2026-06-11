@@ -181,6 +181,52 @@ func (h *Handler) GetSnapshots(c *gin.Context) {
 	utils.OK(c, "snapshots retrieved", snaps)
 }
 
+// ReverseQuote godoc
+// @Summary      Reverse quote: amount of token_in needed to receive an exact amount_out
+// @Tags         pool
+// @Produce      json
+// @Param        amount_out query string true  "Desired output amount"
+// @Param        token_out  query string true  "Output token symbol"
+// @Success      200 {object} utils.Response
+// @Router       /pool/reverse-quote [get]
+func (h *Handler) ReverseQuote(c *gin.Context) {
+	amountOut := c.Query("amount_out")
+	tokenOut := c.Query("token_out")
+	if amountOut == "" || tokenOut == "" {
+		utils.BadRequest(c, "MISSING_PARAMS", "amount_out and token_out are required", nil)
+		return
+	}
+	result, err := h.svc.ReverseQuote(c.Request.Context(), amountOut, tokenOut)
+	if err != nil {
+		utils.InternalServerError(c, "reverse quote failed: "+err.Error())
+		return
+	}
+	utils.OK(c, "reverse quote retrieved", result)
+}
+
+// SimulateAddLiquidity godoc
+// @Summary      Estimate LP tokens minted for given token amounts at current reserves
+// @Tags         pool
+// @Produce      json
+// @Param        amount_0 query string true "Amount of token 0"
+// @Param        amount_1 query string true "Amount of token 1"
+// @Success      200 {object} utils.Response
+// @Router       /pool/simulate/add-liquidity [get]
+func (h *Handler) SimulateAddLiquidity(c *gin.Context) {
+	amount0 := c.Query("amount_0")
+	amount1 := c.Query("amount_1")
+	if amount0 == "" || amount1 == "" {
+		utils.BadRequest(c, "MISSING_PARAMS", "amount_0 and amount_1 are required", nil)
+		return
+	}
+	result, err := h.svc.SimulateAddLiquidity(c.Request.Context(), amount0, amount1)
+	if err != nil {
+		utils.InternalServerError(c, "simulate add-liquidity failed: "+err.Error())
+		return
+	}
+	utils.OK(c, "add-liquidity simulation ready", result)
+}
+
 // GetTVL godoc
 // @Summary      Get current pool TVL (reserve amounts)
 // @Tags         pool

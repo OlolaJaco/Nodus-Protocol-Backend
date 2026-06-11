@@ -59,6 +59,23 @@ func (c *Client) BuildRemoveLiquidity(ctx context.Context, req removeLiquidityRe
 	return &out, c.post(ctx, "/api/v1/pool/build/remove-liquidity", req, &out)
 }
 
+func (c *Client) SimulateRemoveLiquidity(ctx context.Context, address string) (map[string]any, error) {
+	var out map[string]any
+	return out, c.get(ctx, "/api/v1/pool/simulate/remove-liquidity?address="+address, &out)
+}
+
+func (c *Client) SimulateAddLiquidity(ctx context.Context, amount0, amount1 string) (map[string]any, error) {
+	var out map[string]any
+	path := fmt.Sprintf("/api/v1/pool/simulate/add-liquidity?amount_0=%s&amount_1=%s", amount0, amount1)
+	return out, c.get(ctx, path, &out)
+}
+
+func (c *Client) ReverseQuote(ctx context.Context, amountOut, tokenOut string) (map[string]any, error) {
+	var out map[string]any
+	path := fmt.Sprintf("/api/v1/pool/reverse-quote?amount_out=%s&token_out=%s", amountOut, tokenOut)
+	return out, c.get(ctx, path, &out)
+}
+
 func (c *Client) get(ctx context.Context, path string, out any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
 	if err != nil {

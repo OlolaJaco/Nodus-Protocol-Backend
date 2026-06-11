@@ -94,15 +94,18 @@ func (s *Service) RecentSnapshots(ctx context.Context, limit int) ([]models.Pool
 }
 
 // GetLPPosition satisfies the users.LPFetcher interface.
+// Calls the engine's simulate/remove-liquidity endpoint so the response
+// includes token redemption amounts, not just a raw LP balance.
 func (s *Service) GetLPPosition(ctx context.Context, address string) (map[string]any, error) {
-	bal, err := s.client.GetLPBalance(ctx, address)
-	if err != nil {
-		return nil, err
-	}
-	return map[string]any{
-		"address":    bal.Address,
-		"lp_balance": bal.LpBalance,
-	}, nil
+	return s.client.SimulateRemoveLiquidity(ctx, address)
+}
+
+func (s *Service) SimulateAddLiquidity(ctx context.Context, amount0, amount1 string) (map[string]any, error) {
+	return s.client.SimulateAddLiquidity(ctx, amount0, amount1)
+}
+
+func (s *Service) ReverseQuote(ctx context.Context, amountOut, tokenOut string) (map[string]any, error) {
+	return s.client.ReverseQuote(ctx, amountOut, tokenOut)
 }
 
 func (s *Service) GetTVL(ctx context.Context) (map[string]any, error) {
