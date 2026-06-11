@@ -1,6 +1,11 @@
 # Nodus Protocol Backend
 
-Production-ready Go REST API with full user authentication.
+[![CI](https://github.com/Nodus-protocol/Nodus-Protocol-Backend/actions/workflows/ci.yml/badge.svg)](https://github.com/Nodus-protocol/Nodus-Protocol-Backend/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-violet.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.23-00ADD8?logo=go)](go.mod)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
+REST API for the Nodus Protocol AMM DEX — user auth, pool data, payments, and admin endpoints.
 
 ## Stack
 - **Framework**: Gin
@@ -43,42 +48,78 @@ The API will be available at `http://localhost:8080`.
 
 ---
 
-## Auth Endpoints
+## API Reference
 
+### Auth
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | POST | `/api/v1/auth/register` | Public | Create account |
-| POST | `/api/v1/auth/login` | Public | Login, get tokens |
-| POST | `/api/v1/auth/refresh` | Public | Rotate token pair |
-| POST | `/api/v1/auth/logout` | Bearer | Invalidate token |
-| GET  | `/api/v1/auth/verify-email` | Public | Verify email via link |
-| POST | `/api/v1/auth/resend-verification` | Public | Re-send verification |
-| POST | `/api/v1/auth/forgot-password` | Public | Send reset link |
+| POST | `/api/v1/auth/login` | Public | Login, receive token pair |
+| POST | `/api/v1/auth/refresh` | Public | Rotate access + refresh tokens |
+| POST | `/api/v1/auth/logout` | Bearer | Blacklist current token |
+| GET  | `/api/v1/auth/verify-email` | Public | Confirm email via link |
+| POST | `/api/v1/auth/resend-verification` | Public | Re-send confirmation email |
+| POST | `/api/v1/auth/forgot-password` | Public | Send password reset link |
 | POST | `/api/v1/auth/reset-password` | Public | Set new password |
-| GET  | `/api/v1/users/me` | Bearer | Get own profile |
-| PUT  | `/api/v1/users/me` | Bearer | Update profile |
-| PUT  | `/api/v1/users/me/password` | Bearer | Change password |
-| DELETE | `/api/v1/users/me` | Bearer | Delete account |
 
-## Protocol Endpoints
-
-These endpoints power the off-chain indexer for the Nodus Protocol AMM. Pool events emitted by the on-chain contracts (Mint, Burn, Swap, Sync) are indexed and served here.
-
+### Users
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/api/v1/pools` | Public | List all active liquidity pools |
-| GET | `/api/v1/pools/:id` | Public | Get pool by contract address |
-| GET | `/api/v1/pools/:id/volume` | Public | 24h / 7d swap volume for a pool |
-| GET | `/api/v1/pools/:id/tvl` | Public | Current total value locked |
-| GET | `/api/v1/pools/:id/swaps` | Public | Paginated swap history |
-| GET | `/api/v1/pools/:id/positions` | Bearer | LP positions for the authenticated user |
-| GET | `/api/v1/stats` | Public | Protocol-wide TVL, volume, and fee totals |
-| GET | `/api/v1/tokens` | Public | Supported PSP22 token list with metadata |
-| GET | `/api/v1/price/:token` | Public | Latest and TWAP price for a token |
+| GET    | `/api/v1/users/me` | Bearer | Get own profile |
+| PUT    | `/api/v1/users/me` | Bearer | Update name / avatar |
+| DELETE | `/api/v1/users/me` | Bearer | Soft-delete account |
+| PUT    | `/api/v1/users/me/password` | Bearer | Change password |
+| POST   | `/api/v1/users/me/wallet` | Bearer | Link Stellar address |
+| DELETE | `/api/v1/users/me/wallet` | Bearer | Unlink Stellar address |
+| GET    | `/api/v1/users/me/lp-position` | Bearer | Live LP balance + redeemable tokens |
+| GET    | `/api/v1/users/me/transactions` | Bearer | Paginated transaction history |
+| GET    | `/api/v1/users/me/transactions/:id` | Bearer | Single transaction |
+| GET    | `/api/v1/users/me/export` | Bearer | GDPR data export |
 
-## Health Check
+### Pool (public)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/pool/reserves` | Current XLM/USDC reserves |
+| GET | `/api/v1/pool/quote` | Exact-input price quote (optional `?slippage_bps=`) |
+| GET | `/api/v1/pool/reverse-quote` | Exact-output price quote |
+| GET | `/api/v1/pool/lp-balance` | LP balance for a wallet address |
+| GET | `/api/v1/pool/stats` | Prices, k-invariant, fee bps |
+| GET | `/api/v1/pool/tvl` | Current pool TVL |
+| GET | `/api/v1/pool/overview` | Combined stats + last snapshot timestamp |
+| GET | `/api/v1/pool/price-history` | Historical reserve snapshots |
+| GET | `/api/v1/pool/snapshots` | Recent raw snapshots (50) |
+| GET | `/api/v1/pool/simulate/add-liquidity` | Preview LP tokens minted |
+| GET | `/api/v1/pool/simulate/remove-liquidity` | Preview tokens redeemed for an address |
+
+### Pool (authenticated)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/pool/build/swap` | Unsigned swap tx parameters |
+| POST | `/api/v1/pool/build/add-liquidity` | Unsigned add-liquidity tx parameters |
+| POST | `/api/v1/pool/build/remove-liquidity` | Unsigned remove-liquidity tx parameters |
+
+### Payments
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/v1/payments` | Bearer | Initiate payment via Core Engine |
+| GET  | `/api/v1/payments` | Bearer | List own payments |
+| GET  | `/api/v1/payments/:id` | Bearer | Get single payment |
+| GET  | `/api/v1/payments/:id/receipt` | Bearer | Payment receipt |
+
+### Leaderboard & Admin
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api/v1/leaderboard/traders` | Public | Top traders by confirmed volume |
+| GET | `/api/v1/admin/users` | Admin | List all users |
+| GET | `/api/v1/admin/users/:id` | Admin | Get user by ID |
+| PUT | `/api/v1/admin/users/:id/role` | Admin | Change user role |
+| DELETE | `/api/v1/admin/users/:id` | Admin | Hard-delete user |
+| GET | `/api/v1/admin/stats` | Admin | Protocol-wide aggregates |
+| GET | `/api/v1/admin/transactions` | Admin | All transactions |
+
+### Health
 ```
-GET /health
+GET /health   →  { status, database, redis, core_engine }
 ```
 
 ## Make Commands
