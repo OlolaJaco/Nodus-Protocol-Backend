@@ -1,6 +1,8 @@
 package pool
 
 import (
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"github.com/nodus-protocol/backend/internal/utils"
 	"go.uber.org/zap"
@@ -177,4 +179,56 @@ func (h *Handler) GetSnapshots(c *gin.Context) {
 		return
 	}
 	utils.OK(c, "snapshots retrieved", snaps)
+}
+
+// GetTVL godoc
+// @Summary      Get current pool TVL (reserve amounts)
+// @Tags         pool
+// @Produce      json
+// @Success      200 {object} utils.Response
+// @Router       /pool/tvl [get]
+func (h *Handler) GetTVL(c *gin.Context) {
+	tvl, err := h.svc.GetTVL(c.Request.Context())
+	if err != nil {
+		utils.InternalServerError(c, "tvl failed: "+err.Error())
+		return
+	}
+	utils.OK(c, "TVL retrieved", tvl)
+}
+
+// GetPriceHistory godoc
+// @Summary      Get pool price history from stored reserve snapshots
+// @Tags         pool
+// @Produce      json
+// @Param        limit query int false "Number of snapshots (max 500, default 100)"
+// @Success      200 {object} utils.Response
+// @Router       /pool/price-history [get]
+func (h *Handler) GetPriceHistory(c *gin.Context) {
+	limit := 100
+	if v := c.Query("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			limit = n
+		}
+	}
+	snaps, err := h.svc.GetPriceHistory(c.Request.Context(), limit)
+	if err != nil {
+		utils.InternalServerError(c, "price history failed: "+err.Error())
+		return
+	}
+	utils.OK(c, "price history retrieved", snaps)
+}
+
+// GetOverview godoc
+// @Summary      Get pool overview — prices, fees, reserves, last snapshot timestamp
+// @Tags         pool
+// @Produce      json
+// @Success      200 {object} utils.Response
+// @Router       /pool/overview [get]
+func (h *Handler) GetOverview(c *gin.Context) {
+	overview, err := h.svc.GetOverview(c.Request.Context())
+	if err != nil {
+		utils.InternalServerError(c, "overview failed: "+err.Error())
+		return
+	}
+	utils.OK(c, "pool overview retrieved", overview)
 }

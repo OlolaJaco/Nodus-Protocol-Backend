@@ -96,9 +96,15 @@ func main() {
 	authHandler := auth.NewHandler(authSvc, log)
 	auth.RegisterRoutes(v1, authHandler, jwtManager, rdb)
 
+	// Pool module — must be wired before Users so the LP fetcher can be injected
+	poolClient := pool.NewClient(cfg.CoreEngine.URL)
+	poolSvc := pool.NewService(poolClient, db, rdb, log)
+	poolHandler := pool.NewHandler(poolSvc, log)
+	pool.RegisterRoutes(v1, poolHandler, jwtManager, rdb)
+
 	// Users module
 	usersRepo := users.NewRepository(db)
-	usersSvc := users.NewService(usersRepo, log)
+	usersSvc := users.NewService(usersRepo, log).WithLPFetcher(poolSvc)
 	usersHandler := users.NewHandler(usersSvc, log)
 	users.RegisterRoutes(v1, usersHandler, jwtManager, rdb)
 
@@ -109,12 +115,6 @@ func main() {
 	paymentsHandler := payments.NewHandler(paymentsSvc, log)
 	payments.RegisterRoutes(v1, paymentsHandler, jwtManager, rdb)
 	log.Info("payments module wired", zap.String("core_engine", cfg.CoreEngine.URL))
-
-	// Pool module — wired to Core Engine AMM pool endpoints (backed by Smart Contract)
-	poolClient := pool.NewClient(cfg.CoreEngine.URL)
-	poolSvc := pool.NewService(poolClient, db, rdb, log)
-	poolHandler := pool.NewHandler(poolSvc, log)
-	pool.RegisterRoutes(v1, poolHandler, jwtManager, rdb)
 
 	if cfg.Stellar.PoolConfigured() {
 		log.Info("AMM pool module wired",

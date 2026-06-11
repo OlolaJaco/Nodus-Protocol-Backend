@@ -93,6 +93,67 @@ func (s *Service) RecentSnapshots(ctx context.Context, limit int) ([]models.Pool
 	return snaps, err
 }
 
+// GetLPPosition satisfies the users.LPFetcher interface.
+func (s *Service) GetLPPosition(ctx context.Context, address string) (map[string]any, error) {
+	bal, err := s.client.GetLPBalance(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"address":    bal.Address,
+		"lp_balance": bal.LpBalance,
+	}, nil
+}
+
+func (s *Service) GetTVL(ctx context.Context) (map[string]any, error) {
+	r, err := s.GetReserves(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// TVL is expressed as the two raw reserve amounts + their token labels.
+	return map[string]any{
+		"token_0":        r.Token0,
+		"reserve_0":      r.Reserve0,
+		"token_1":        r.Token1,
+		"reserve_1":      r.Reserve1,
+		"lp_total_supply": r.LpTotalSupply,
+	}, nil
+}
+
+func (s *Service) GetPriceHistory(ctx context.Context, limit int) ([]models.PoolSnapshot, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	return s.RecentSnapshots(ctx, limit)
+}
+
+func (s *Service) GetOverview(ctx context.Context) (map[string]any, error) {
+	stats, err := s.GetStats(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("stats: %w", err)
+	}
+	snaps, err := s.RecentSnapshots(ctx, 1)
+	if err != nil {
+		return nil, fmt.Errorf("snapshots: %w", err)
+	}
+	out := map[string]any{
+		"price_token0_in_token1": stats.PriceToken0InToken1,
+		"price_token1_in_token0": stats.PriceToken1InToken0,
+		"k_invariant":            stats.KInvariant,
+		"fee_bps":                stats.FeeBps,
+		"reserves": map[string]any{
+			"token_0":   stats.Reserves.Token0,
+			"reserve_0": stats.Reserves.Reserve0,
+			"token_1":   stats.Reserves.Token1,
+			"reserve_1": stats.Reserves.Reserve1,
+		},
+	}
+	if len(snaps) > 0 {
+		out["last_snapshot_at"] = snaps[0].CreatedAt
+	}
+	return out, nil
+}
+
 func (s *Service) getCache(ctx context.Context, key string) []byte {
 	val, err := s.rdb.Get(ctx, key).Bytes()
 	if err != nil {

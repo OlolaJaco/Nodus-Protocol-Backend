@@ -24,6 +24,7 @@ type User struct {
 	LastName        string         `gorm:"type:varchar(100)" json:"last_name"`
 	AvatarURL       string         `gorm:"type:varchar(512)" json:"avatar_url,omitempty"`
 	Role            UserRole       `gorm:"type:varchar(20);default:'user'" json:"role"`
+	StellarAddress  string         `gorm:"type:varchar(60);uniqueIndex" json:"stellar_address,omitempty"`
 	IsEmailVerified bool           `gorm:"default:false" json:"is_email_verified"`
 	IsActive        bool           `gorm:"default:true" json:"is_active"`
 	LastLoginAt     *time.Time     `json:"last_login_at,omitempty"`

@@ -8,7 +8,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// Repository handles database operations for the users domain.
 type Repository struct {
 	db *gorm.DB
 }
@@ -17,7 +16,6 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-// FindByID retrieves an active user by UUID.
 func (r *Repository) FindByID(id uuid.UUID) (*models.User, error) {
 	var user models.User
 	err := r.db.Where("id = ? AND is_active = true", id).First(&user).Error
@@ -27,14 +25,147 @@ func (r *Repository) FindByID(id uuid.UUID) (*models.User, error) {
 	return &user, err
 }
 
-// Update saves updated fields on a user.
+func (r *Repository) FindAll(limit, offset int, search string) ([]models.User, int64, error) {
+	var users []models.User
+	var total int64
+
+	base := r.db.Model(&models.User{})
+	if search != "" {
+		like := "%" + search + "%"
+		base = base.Where("email ILIKE ? OR first_name ILIKE ? OR last_name ILIKE ?", like, like, like)
+	}
+
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := base.Order("created_at DESC").Limit(limit).Offset(offset).Find(&users).Error
+	return users, total, err
+}
+
 func (r *Repository) Update(user *models.User) error {
 	return r.db.Save(user).Error
 }
 
-// SoftDelete marks a user as inactive (soft delete).
+func (r *Repository) UpdateStellarAddress(id uuid.UUID, address string) error {
+	return r.db.Model(&models.User{}).Where("id = ?", id).Update("stellar_address", address).Error
+}
+
+func (r *Repository) UpdateRole(id uuid.UUID, role models.UserRole) error {
+	return r.db.Model(&models.User{}).Where("id = ?", id).Update("role", role).Error
+}
+
 func (r *Repository) SoftDelete(id uuid.UUID) error {
 	return r.db.Model(&models.User{}).Where("id = ?", id).Update("is_active", false).Error
 }
 
-var ErrUserNotFound = errors.New("user not found")
+func (r *Repository) HardDelete(id uuid.UUID) error {
+	return r.db.Unscoped().Delete(&models.User{}, "id = ?", id).Error
+}
+
+func (r *Repository) ListTransactionsByUser(
+	userID uuid.UUID, limit, offset int, status, token string,
+) ([]models.Transaction, int64, error) {
+	var txs []models.Transaction
+	var total int64
+
+	base := r.db.Model(&models.Transaction{}).Where("user_id = ? AND deleted_at IS NULL", userID)
+	if status != "" {
+		base = base.Where("status = ?", status)
+	}
+	if token != "" {
+		base = base.Where("token = ?", token)
+	}
+
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := base.Order("created_at DESC").Limit(limit).Offset(offset).Find(&txs).Error
+	return txs, total, err
+}
+
+func (r *Repository) FindTransactionByID(txID, userID uuid.UUID) (*models.Transaction, error) {
+	var tx models.Transaction
+	err := r.db.
+		Where("id = ? AND user_id = ? AND deleted_at IS NULL", txID, userID).
+		First(&tx).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrTransactionNotFound
+	}
+	return &tx, err
+}
+
+func (r *Repository) ProtocolStats() (map[string]any, error) {
+	var totalUsers, activeUsers, verifiedUsers, totalTxs int64
+	var volumeResult struct{ Volume *float64 }
+
+	r.db.Model(&models.User{}).Count(&totalUsers)
+	r.db.Model(&models.User{}).Where("is_active = true").Count(&activeUsers)
+	r.db.Model(&models.User{}).Where("is_email_verified = true").Count(&verifiedUsers)
+	r.db.Model(&models.Transaction{}).Where("deleted_at IS NULL").Count(&totalTxs)
+	r.db.Model(&models.Transaction{}).
+		Where("deleted_at IS NULL AND status = 'confirmed'").
+		Select("SUM(amount) as volume").
+		Scan(&volumeResult)
+
+	vol := float64(0)
+	if volumeResult.Volume != nil {
+		vol = *volumeResult.Volume
+	}
+
+	return map[string]any{
+		"total_users":              totalUsers,
+		"active_users":             activeUsers,
+		"verified_users":           verifiedUsers,
+		"total_transactions":       totalTxs,
+		"confirmed_volume_stroops": vol,
+	}, nil
+}
+
+func (r *Repository) ListAllTransactions(limit, offset int, status string) ([]models.Transaction, int64, error) {
+	var txs []models.Transaction
+	var total int64
+
+	base := r.db.Model(&models.Transaction{}).Where("deleted_at IS NULL")
+	if status != "" {
+		base = base.Where("status = ?", status)
+	}
+
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := base.Order("created_at DESC").Limit(limit).Offset(offset).Find(&txs).Error
+	return txs, total, err
+}
+
+func (r *Repository) TopTraders(limit int) ([]map[string]any, error) {
+	var results []struct {
+		Sender string
+		Volume float64
+		Count  int64
+	}
+	err := r.db.Model(&models.Transaction{}).
+		Select("sender, SUM(amount) as volume, COUNT(*) as count").
+		Where("deleted_at IS NULL AND status = 'confirmed'").
+		Group("sender").
+		Order("volume DESC").
+		Limit(limit).
+		Scan(&results).Error
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]map[string]any, len(results))
+	for i, row := range results {
+		out[i] = map[string]any{
+			"address":           row.Sender,
+			"volume_stroops":    row.Volume,
+			"transaction_count": row.Count,
+		}
+	}
+	return out, nil
+}
+
+var (
+	ErrUserNotFound        = errors.New("user not found")
+	ErrTransactionNotFound = errors.New("transaction not found")
+)
