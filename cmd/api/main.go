@@ -92,9 +92,32 @@ func main() {
 
 	// Auth module
 	authRepo := auth.NewRepository(db)
-	authSvc := auth.NewService(authRepo, jwtManager, rdb, mailer, cfg, log)
+
+	// SEP-10 is optional — only enabled when STELLAR_SERVER_SECRET is configured.
+	var sep10Manager *utils.Sep10Manager
+	var sep10Handler *auth.Sep10Handler
+	if cfg.Stellar.ServerSecretKey != "" {
+		var sep10Err error
+		sep10Manager, sep10Err = utils.NewSep10Manager(
+			cfg.Stellar.ServerSecretKey,
+			cfg.Stellar.WebAuthDomain,
+			cfg.Stellar.Network,
+			cfg.Stellar.ChallengeTTL,
+		)
+		if sep10Err != nil {
+			log.Fatal("failed to initialize SEP-10 manager", zap.Error(sep10Err))
+		}
+		log.Info("SEP-10 stellar auth enabled", zap.String("server_account", sep10Manager.ServerAddress()))
+	} else {
+		log.Warn("STELLAR_SERVER_SECRET not set — SEP-10 stellar auth disabled")
+	}
+
+	authSvc := auth.NewService(authRepo, jwtManager, sep10Manager, rdb, mailer, cfg, log)
 	authHandler := auth.NewHandler(authSvc, log)
-	auth.RegisterRoutes(v1, authHandler, jwtManager, rdb)
+	if sep10Manager != nil {
+		sep10Handler = auth.NewSep10Handler(authSvc, sep10Manager, log)
+	}
+	auth.RegisterRoutes(v1, authHandler, sep10Handler, jwtManager, rdb)
 
 	// Pool module — must be wired before Users so the LP fetcher can be injected
 	poolClient := pool.NewClient(cfg.CoreEngine.URL)

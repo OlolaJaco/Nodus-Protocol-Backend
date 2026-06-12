@@ -107,13 +107,13 @@ func (s *Service) GetLPPosition(ctx context.Context, userID uuid.UUID) (map[stri
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
-	if user.StellarAddress == "" {
+	if user.StellarAccountID == nil || *user.StellarAccountID == "" {
 		return nil, ErrNoWalletLinked
 	}
 	if s.lpFetcher == nil {
 		return nil, fmt.Errorf("LP fetcher not configured")
 	}
-	return s.lpFetcher.GetLPPosition(ctx, user.StellarAddress)
+	return s.lpFetcher.GetLPPosition(ctx, *user.StellarAccountID)
 }
 
 // ── Transactions ──────────────────────────────────────────────────────────────

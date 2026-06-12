@@ -92,6 +92,41 @@ func (r *Repository) DeleteExpiredTokens() error {
 	return r.db.Where("expires_at < ? OR used = true", time.Now()).Delete(&models.Token{}).Error
 }
 
+// FindUserByStellarAccount retrieves an active user by their linked Stellar account ID.
+func (r *Repository) FindUserByStellarAccount(accountID string) (*models.User, error) {
+	var user models.User
+	err := r.db.Where("stellar_account_id = ? AND is_active = true", accountID).First(&user).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrUserNotFound
+	}
+	return &user, err
+}
+
+// LinkStellarAccount associates a Stellar account ID with an existing user.
+func (r *Repository) LinkStellarAccount(userID uuid.UUID, accountID string) error {
+	return r.db.Model(&models.User{}).Where("id = ?", userID).Update("stellar_account_id", accountID).Error
+}
+
+// CreateStellarUser creates a new user authenticated only via SEP-10 (no password).
+// A placeholder email derived from the Stellar account is stored to satisfy the NOT NULL constraint.
+func (r *Repository) CreateStellarUser(accountID string) (*models.User, error) {
+	placeholderEmail := accountID + "@stellar.nodus.local"
+	// Use a sentinel value that will never match any real bcrypt hash.
+	user := &models.User{
+		Email:            placeholderEmail,
+		PasswordHash:     "$stellar$",
+		FirstName:        "Stellar",
+		LastName:         accountID[:8],
+		Role:             models.RoleUser,
+		IsEmailVerified:  true,
+		StellarAccountID: &accountID,
+	}
+	if err := r.db.Create(user).Error; err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
 // Sentinel errors
 var (
 	ErrUserNotFound  = errors.New("user not found")

@@ -83,21 +83,26 @@ type LogConfig struct {
 	Format string `mapstructure:"LOG_FORMAT"`
 }
 
-// CoreEngineConfig holds connection settings for the Nodus Core Engine.
 type CoreEngineConfig struct {
 	URL     string        `mapstructure:"CORE_ENGINE_URL"`
 	Timeout time.Duration `mapstructure:"CORE_ENGINE_TIMEOUT"`
 }
 
-// StellarConfig holds Stellar / Soroban connection settings.
-// Used to proxy AMM pool reads from the Core Engine.
 type StellarConfig struct {
-	Network        string `mapstructure:"STELLAR_NETWORK"`
-	HorizonURL     string `mapstructure:"HORIZON_URL"`
-	SorobanRPCURL  string `mapstructure:"SOROBAN_RPC_URL"`
+	// Network
+	Network       string `mapstructure:"STELLAR_NETWORK"`
+	HorizonURL    string `mapstructure:"STELLAR_HORIZON_URL"`
+	SorobanRPCURL string `mapstructure:"SOROBAN_RPC_URL"`
+
+	// AMM pool contract
 	PoolContractID string `mapstructure:"POOL_CONTRACT_ID"`
 	PoolToken0     string `mapstructure:"POOL_TOKEN_0"`
 	PoolToken1     string `mapstructure:"POOL_TOKEN_1"`
+
+	// SEP-10 Web Authentication
+	ServerSecretKey string        `mapstructure:"STELLAR_SERVER_SECRET"`
+	WebAuthDomain   string        `mapstructure:"SEP10_WEB_AUTH_DOMAIN"`
+	ChallengeTTL    time.Duration `mapstructure:"SEP10_CHALLENGE_TTL"`
 }
 
 func (s StellarConfig) PoolConfigured() bool {
@@ -134,7 +139,9 @@ func Load() (*Config, error) {
 	v.SetDefault("CORE_ENGINE_URL", "http://localhost:8081")
 	v.SetDefault("CORE_ENGINE_TIMEOUT", 15*time.Second)
 	v.SetDefault("STELLAR_NETWORK", "testnet")
-	v.SetDefault("HORIZON_URL", "https://horizon-testnet.stellar.org")
+	v.SetDefault("STELLAR_HORIZON_URL", "https://horizon-testnet.stellar.org")
+	v.SetDefault("SEP10_WEB_AUTH_DOMAIN", "nodus.localhost")
+	v.SetDefault("SEP10_CHALLENGE_TTL", 15*time.Minute)
 
 	v.SetConfigFile(".env")
 	v.SetConfigType("env")
@@ -153,7 +160,13 @@ func Load() (*Config, error) {
 		cfg.Email = EmailConfig{Host: v.GetString("SMTP_HOST"), Port: v.GetInt("SMTP_PORT"), Username: v.GetString("SMTP_USERNAME"), Password: v.GetString("SMTP_PASSWORD"), From: v.GetString("SMTP_FROM"), FromName: v.GetString("SMTP_FROM_NAME")}
 		cfg.Log = LogConfig{Level: v.GetString("LOG_LEVEL"), Format: v.GetString("LOG_FORMAT")}
 		cfg.CoreEngine = CoreEngineConfig{URL: v.GetString("CORE_ENGINE_URL"), Timeout: v.GetDuration("CORE_ENGINE_TIMEOUT")}
-		cfg.Stellar = StellarConfig{Network: v.GetString("STELLAR_NETWORK"), HorizonURL: v.GetString("HORIZON_URL"), SorobanRPCURL: v.GetString("SOROBAN_RPC_URL"), PoolContractID: v.GetString("POOL_CONTRACT_ID"), PoolToken0: v.GetString("POOL_TOKEN_0"), PoolToken1: v.GetString("POOL_TOKEN_1")}
+		cfg.Stellar = StellarConfig{
+			Network: v.GetString("STELLAR_NETWORK"), HorizonURL: v.GetString("STELLAR_HORIZON_URL"),
+			SorobanRPCURL: v.GetString("SOROBAN_RPC_URL"), PoolContractID: v.GetString("POOL_CONTRACT_ID"),
+			PoolToken0: v.GetString("POOL_TOKEN_0"), PoolToken1: v.GetString("POOL_TOKEN_1"),
+			ServerSecretKey: v.GetString("STELLAR_SERVER_SECRET"), WebAuthDomain: v.GetString("SEP10_WEB_AUTH_DOMAIN"),
+			ChallengeTTL: v.GetDuration("SEP10_CHALLENGE_TTL"),
+		}
 	}
 
 	return cfg, nil

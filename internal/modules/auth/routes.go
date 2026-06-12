@@ -3,12 +3,12 @@ package auth
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/nodus-protocol/backend/internal/middleware"
-	"github.com/redis/go-redis/v9"
 	"github.com/nodus-protocol/backend/internal/utils"
+	"github.com/redis/go-redis/v9"
 )
 
 // RegisterRoutes mounts all auth routes onto the given router group.
-func RegisterRoutes(rg *gin.RouterGroup, h *Handler, jwtManager *utils.JWTManager, rdb *redis.Client) {
+func RegisterRoutes(rg *gin.RouterGroup, h *Handler, sep10h *Sep10Handler, jwtManager *utils.JWTManager, rdb *redis.Client) {
 	auth := rg.Group("/auth")
 
 	// Public routes — rate-limited strictly
@@ -22,6 +22,12 @@ func RegisterRoutes(rg *gin.RouterGroup, h *Handler, jwtManager *utils.JWTManage
 		public.POST("/resend-verification", h.ResendVerification)
 		public.POST("/forgot-password", h.ForgotPassword)
 		public.POST("/reset-password", h.ResetPassword)
+
+		// SEP-10 Stellar Web Authentication
+		if sep10h != nil {
+			public.GET("/stellar/challenge", sep10h.StellarChallenge)
+			public.POST("/stellar/token", sep10h.StellarToken)
+		}
 	}
 
 	// Protected routes

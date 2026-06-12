@@ -25,6 +25,7 @@ type TokenPair struct {
 type Service struct {
 	repo       *Repository
 	jwt        *utils.JWTManager
+	sep10      *utils.Sep10Manager
 	rdb        *redis.Client
 	mailer     *utils.Mailer
 	cfg        *config.Config
@@ -32,8 +33,8 @@ type Service struct {
 }
 
 // NewService creates a new auth Service.
-func NewService(repo *Repository, jwt *utils.JWTManager, rdb *redis.Client, mailer *utils.Mailer, cfg *config.Config, log *zap.Logger) *Service {
-	return &Service{repo: repo, jwt: jwt, rdb: rdb, mailer: mailer, cfg: cfg, log: log}
+func NewService(repo *Repository, jwt *utils.JWTManager, sep10 *utils.Sep10Manager, rdb *redis.Client, mailer *utils.Mailer, cfg *config.Config, log *zap.Logger) *Service {
+	return &Service{repo: repo, jwt: jwt, sep10: sep10, rdb: rdb, mailer: mailer, cfg: cfg, log: log}
 }
 
 // Register creates a new user, hashes password, and sends verification email.
@@ -286,6 +287,42 @@ func (s *Service) sendPasswordResetEmail(user *models.User) error {
 	return s.mailer.SendPasswordResetEmail(user.Email, user.FullName(), resetURL)
 }
 
+// StellarToken verifies a client-signed SEP-10 challenge and returns a JWT token pair.
+// If the Stellar account has never been seen before, a new user is auto-created.
+func (s *Service) StellarToken(xdrBase64 string) (*TokenPair, *models.User, error) {
+	if s.sep10 == nil {
+		return nil, nil, ErrSep10Disabled
+	}
+
+	accountID, err := s.sep10.VerifyChallenge(xdrBase64)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	user, err := s.repo.FindUserByStellarAccount(accountID)
+	if err != nil {
+		// First-time Stellar login — auto-create the user.
+		user, err = s.repo.CreateStellarUser(accountID)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create stellar user: %w", err)
+		}
+		s.log.Info("stellar user created", zap.String("account", accountID), zap.String("user_id", user.ID.String()))
+	}
+
+	if !user.IsActive {
+		return nil, nil, ErrAccountDisabled
+	}
+
+	pair, err := s.issueTokenPair(user)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	_ = s.repo.UpdateUserLastLogin(user.ID)
+	s.log.Info("stellar user authenticated", zap.String("account", accountID), zap.String("user_id", user.ID.String()))
+	return pair, user, nil
+}
+
 // Sentinel service errors
 var (
 	ErrEmailAlreadyTaken    = errors.New("email is already registered")
@@ -294,4 +331,5 @@ var (
 	ErrInvalidRefreshToken  = errors.New("invalid or expired refresh token")
 	ErrInvalidToken         = errors.New("invalid or expired token")
 	ErrEmailAlreadyVerified = errors.New("email is already verified")
+	ErrSep10Disabled        = errors.New("stellar authentication is not configured")
 )
