@@ -33,6 +33,9 @@ func RegisterRoutes(rg *gin.RouterGroup, h *Handler, jwtManager *utils.JWTManage
 
 		// GDPR export
 		me.GET("/export", h.ExportData)
+
+		// Leaderboard preferences
+		me.PATCH("/preferences", h.UpdatePreferences)
 	}
 
 	// Admin (requires admin role, inherits auth)
