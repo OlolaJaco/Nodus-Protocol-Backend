@@ -43,6 +43,11 @@ type adminUpdateRoleRequest struct {
 	Role string `json:"role" validate:"required,oneof=user admin"`
 }
 
+type updatePreferencesRequest struct {
+	ShowInLeaderboard bool   `json:"show_in_leaderboard"`
+	LeaderboardAlias  string `json:"leaderboard_alias" validate:"omitempty,max=32,alphanum"`
+}
+
 // ── Self endpoints ────────────────────────────────────────────────────────────
 
 func (h *Handler) GetMe(c *gin.Context) {
@@ -243,6 +248,36 @@ func (h *Handler) ExportData(c *gin.Context) {
 		return
 	}
 	utils.OK(c, "data export ready", data)
+}
+
+// ── Preferences ───────────────────────────────────────────────────────────────
+
+func (h *Handler) UpdatePreferences(c *gin.Context) {
+	userID, ok := extractUserID(c)
+	if !ok {
+		utils.Unauthorized(c, "not authenticated")
+		return
+	}
+	var req updatePreferencesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, "INVALID_BODY", "malformed request body", nil)
+		return
+	}
+	if errs := h.validateRequest(&req); errs != nil {
+		utils.UnprocessableEntity(c, "VALIDATION_ERROR", "validation failed", errs)
+		return
+	}
+	user, err := h.svc.UpdatePreferences(userID, req.ShowInLeaderboard, req.LeaderboardAlias)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			utils.NotFound(c, "user")
+			return
+		}
+		h.log.Error("update preferences failed", zap.Error(err))
+		utils.InternalServerError(c, "failed to update preferences")
+		return
+	}
+	utils.OK(c, "preferences updated", user)
 }
 
 // ── Admin endpoints ───────────────────────────────────────────────────────────
