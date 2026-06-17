@@ -251,6 +251,22 @@ func (s *Service) LeaderboardTraders(limit int) ([]map[string]any, error) {
 	return s.repo.TopTraders(limit)
 }
 
+// ── Preferences ───────────────────────────────────────────────────────────────
+
+func (s *Service) UpdatePreferences(userID uuid.UUID, showInLeaderboard bool, alias string) (*models.User, error) {
+	if _, err := s.repo.FindByID(userID); err != nil {
+		return nil, ErrUserNotFound
+	}
+	if err := s.repo.UpdatePreferences(userID, showInLeaderboard, alias); err != nil {
+		return nil, fmt.Errorf("failed to update preferences: %w", err)
+	}
+	s.log.Info("leaderboard preferences updated",
+		zap.String("user_id", userID.String()),
+		zap.Bool("show_in_leaderboard", showInLeaderboard),
+	)
+	return s.repo.FindByID(userID)
+}
+
 var (
 	ErrInvalidPassword       = errors.New("current password is incorrect")
 	ErrNoWalletLinked        = errors.New("no stellar wallet linked to this account")
