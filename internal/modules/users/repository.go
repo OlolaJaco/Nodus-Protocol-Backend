@@ -139,17 +139,33 @@ func (r *Repository) ListAllTransactions(limit, offset int, status string) ([]mo
 
 func (r *Repository) TopTraders(limit int) ([]map[string]any, error) {
 	var results []struct {
-		Sender string
-		Volume float64
-		Count  int64
+		DisplayName string
+		Volume      float64
+		TxCount     int64
 	}
-	err := r.db.Model(&models.Transaction{}).
-		Select("sender, SUM(amount) as volume, COUNT(*) as count").
-		Where("deleted_at IS NULL AND status = 'confirmed'").
-		Group("sender").
-		Order("volume DESC").
-		Limit(limit).
-		Scan(&results).Error
+	// Only include users who have explicitly opted in (show_in_leaderboard = true).
+	// The full Stellar address is never returned; opted-in users show their alias
+	// or an abbreviated form (first4...last4) if no alias is set.
+	err := r.db.Raw(`
+		SELECT
+			CASE
+				WHEN u.leaderboard_alias IS NOT NULL AND u.leaderboard_alias <> ''
+					THEN u.leaderboard_alias
+				ELSE LEFT(t.sender, 4) || '...' || RIGHT(t.sender, 4)
+			END AS display_name,
+			SUM(t.amount) AS volume,
+			COUNT(*) AS tx_count
+		FROM transactions t
+		INNER JOIN users u
+			ON u.stellar_account_id = t.sender
+			AND u.deleted_at IS NULL
+			AND u.show_in_leaderboard = true
+		WHERE t.deleted_at IS NULL
+		  AND t.status = 'confirmed'
+		GROUP BY t.sender, u.leaderboard_alias
+		ORDER BY volume DESC
+		LIMIT ?
+	`, limit).Scan(&results).Error
 	if err != nil {
 		return nil, err
 	}
@@ -157,12 +173,28 @@ func (r *Repository) TopTraders(limit int) ([]map[string]any, error) {
 	out := make([]map[string]any, len(results))
 	for i, row := range results {
 		out[i] = map[string]any{
-			"address":           row.Sender,
+			"display_name":      row.DisplayName,
 			"volume_stroops":    row.Volume,
-			"transaction_count": row.Count,
+			"transaction_count": row.TxCount,
 		}
 	}
 	return out, nil
+}
+
+func (r *Repository) UpdatePreferences(userID uuid.UUID, showInLeaderboard *bool, alias *string) error {
+	updates := map[string]any{}
+	if showInLeaderboard != nil {
+		updates["show_in_leaderboard"] = *showInLeaderboard
+	}
+	if alias != nil {
+		updates["leaderboard_alias"] = *alias
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	return r.db.Model(&models.User{}).
+		Where("id = ?", userID).
+		Updates(updates).Error
 }
 
 var (

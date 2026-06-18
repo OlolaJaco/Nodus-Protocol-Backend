@@ -25,8 +25,10 @@ type User struct {
 	Role             UserRole       `gorm:"type:varchar(20);default:'user'" json:"role"`
 	IsEmailVerified  bool           `gorm:"default:false" json:"is_email_verified"`
 	IsActive         bool           `gorm:"default:true" json:"is_active"`
-	StellarAccountID *string        `gorm:"type:varchar(56);uniqueIndex" json:"stellar_account_id,omitempty"`
-	LastLoginAt      *time.Time     `json:"last_login_at,omitempty"`
+	StellarAccountID  *string        `gorm:"type:varchar(56);uniqueIndex" json:"stellar_account_id,omitempty"`
+	ShowInLeaderboard bool           `gorm:"default:false" json:"show_in_leaderboard"`
+	LeaderboardAlias  string         `gorm:"type:varchar(32)" json:"leaderboard_alias,omitempty"`
+	LastLoginAt       *time.Time     `json:"last_login_at,omitempty"`
 	CreatedAt        time.Time      `json:"created_at"`
 	UpdatedAt        time.Time      `json:"updated_at"`
 	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
