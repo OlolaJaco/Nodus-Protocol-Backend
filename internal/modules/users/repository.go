@@ -157,7 +157,7 @@ func (r *Repository) TopTraders(limit int) ([]map[string]any, error) {
 			COUNT(*) AS tx_count
 		FROM transactions t
 		INNER JOIN users u
-			ON u.stellar_address = t.sender
+			ON u.stellar_account_id = t.sender
 			AND u.deleted_at IS NULL
 			AND u.show_in_leaderboard = true
 		WHERE t.deleted_at IS NULL
@@ -181,13 +181,20 @@ func (r *Repository) TopTraders(limit int) ([]map[string]any, error) {
 	return out, nil
 }
 
-func (r *Repository) UpdatePreferences(userID uuid.UUID, showInLeaderboard bool, alias string) error {
+func (r *Repository) UpdatePreferences(userID uuid.UUID, showInLeaderboard *bool, alias *string) error {
+	updates := map[string]any{}
+	if showInLeaderboard != nil {
+		updates["show_in_leaderboard"] = *showInLeaderboard
+	}
+	if alias != nil {
+		updates["leaderboard_alias"] = *alias
+	}
+	if len(updates) == 0 {
+		return nil
+	}
 	return r.db.Model(&models.User{}).
 		Where("id = ?", userID).
-		Updates(map[string]any{
-			"show_in_leaderboard": showInLeaderboard,
-			"leaderboard_alias":   alias,
-		}).Error
+		Updates(updates).Error
 }
 
 var (

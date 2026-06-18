@@ -40,8 +40,8 @@ func TestTopTraders_OnlyIncludesOptedInUsers(t *testing.T) {
 	rows := sqlmock.NewRows([]string{"display_name", "volume", "tx_count"}).
 		AddRow("CryptoWhale", 50000.0, int64(15))
 
-	// The raw SQL must contain the consent filter.
-	mock.ExpectQuery("show_in_leaderboard").WillReturnRows(rows)
+	// The raw SQL must JOIN on stellar_account_id and filter by consent.
+	mock.ExpectQuery(`(?i)INNER JOIN users.*stellar_account_id.*show_in_leaderboard`).WillReturnRows(rows)
 
 	result, err := repo.TopTraders(10)
 	require.NoError(t, err)
@@ -64,7 +64,7 @@ func TestTopTraders_EmptyWhenNoUsersOptedIn(t *testing.T) {
 	repo := users.NewRepository(db)
 
 	rows := sqlmock.NewRows([]string{"display_name", "volume", "tx_count"})
-	mock.ExpectQuery("show_in_leaderboard").WillReturnRows(rows)
+	mock.ExpectQuery(`(?i)INNER JOIN users.*stellar_account_id.*show_in_leaderboard`).WillReturnRows(rows)
 
 	result, err := repo.TopTraders(10)
 	require.NoError(t, err)
@@ -81,7 +81,7 @@ func TestTopTraders_AbbreviatedAddressWhenNoAlias(t *testing.T) {
 	// Abbreviated form produced by the SQL CASE: GABC...XY56
 	rows := sqlmock.NewRows([]string{"display_name", "volume", "tx_count"}).
 		AddRow("GABC...XY56", 12000.0, int64(3))
-	mock.ExpectQuery("show_in_leaderboard").WillReturnRows(rows)
+	mock.ExpectQuery(`(?i)INNER JOIN users.*stellar_account_id.*show_in_leaderboard`).WillReturnRows(rows)
 
 	result, err := repo.TopTraders(10)
 	require.NoError(t, err)
@@ -102,11 +102,13 @@ func TestUpdatePreferences_SetsConsentFields(t *testing.T) {
 	userID := uuid.New()
 
 	mock.ExpectBegin()
-	mock.ExpectExec(`UPDATE.*users`).
+	mock.ExpectExec(`(?i)UPDATE.*users.*SET.*show_in_leaderboard`).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	err := repo.UpdatePreferences(userID, true, "Trader42")
+	show := true
+	alias := "Trader42"
+	err := repo.UpdatePreferences(userID, &show, &alias)
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -120,11 +122,13 @@ func TestUpdatePreferences_CanOptOut(t *testing.T) {
 	userID := uuid.New()
 
 	mock.ExpectBegin()
-	mock.ExpectExec(`UPDATE.*users`).
+	mock.ExpectExec(`(?i)UPDATE.*users.*SET.*show_in_leaderboard`).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	err := repo.UpdatePreferences(userID, false, "")
+	show := false
+	alias := ""
+	err := repo.UpdatePreferences(userID, &show, &alias)
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

@@ -44,8 +44,8 @@ type adminUpdateRoleRequest struct {
 }
 
 type updatePreferencesRequest struct {
-	ShowInLeaderboard bool   `json:"show_in_leaderboard"`
-	LeaderboardAlias  string `json:"leaderboard_alias" validate:"omitempty,max=32,alphanum"`
+	ShowInLeaderboard *bool   `json:"show_in_leaderboard"`
+	LeaderboardAlias  *string `json:"leaderboard_alias" validate:"omitempty,max=32,alphanum"`
 }
 
 // ── Self endpoints ────────────────────────────────────────────────────────────
