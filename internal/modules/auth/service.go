@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nbutton23/zxcvbn-go"
 	"github.com/nodus-protocol/backend/internal/config"
 	"github.com/nodus-protocol/backend/internal/models"
 	"github.com/nodus-protocol/backend/internal/utils"
@@ -37,8 +38,22 @@ func NewService(repo *Repository, jwt *utils.JWTManager, sep10 *utils.Sep10Manag
 	return &Service{repo: repo, jwt: jwt, sep10: sep10, rdb: rdb, mailer: mailer, cfg: cfg, log: log}
 }
 
+const minPasswordScore = 3 // zxcvbn scale: 0=very weak, 1=weak, 2=fair, 3=strong, 4=very strong
+
 // Register creates a new user, hashes password, and sends verification email.
 func (s *Service) Register(email, password, firstName, lastName string) (*models.User, error) {
+	// Validate password strength BEFORE hashing (hashing is expensive — fail fast)
+	userInputs := []string{email, firstName, lastName}
+	strength := zxcvbn.PasswordStrength(password, userInputs)
+
+	if strength.Score < minPasswordScore {
+		return nil, &ValidationError{
+			Field:   "password",
+			Code:    "PASSWORD_TOO_WEAK",
+			Message: fmt.Sprintf("Password is too weak (score: %d/%d). Please use a stronger password with a mix of characters.", strength.Score, 4),
+		}
+	}
+
 	// Check if email already exists
 	existing, err := s.repo.FindUserByEmail(email)
 	if err == nil && existing != nil {
@@ -197,6 +212,24 @@ func (s *Service) ResetPassword(rawToken, newPassword string) error {
 	token, err := s.repo.FindValidToken(tokenHash, models.TokenTypePasswordReset)
 	if err != nil {
 		return ErrInvalidToken
+	}
+
+	// Fetch user to get context for password strength validation
+	user, err := s.repo.FindUserByID(token.UserID)
+	if err != nil {
+		return fmt.Errorf("failed to find user: %w", err)
+	}
+
+	// Validate password strength for reset password as well
+	userInputs := []string{user.Email, user.FirstName, user.LastName}
+	strength := zxcvbn.PasswordStrength(newPassword, userInputs)
+
+	if strength.Score < minPasswordScore {
+		return &ValidationError{
+			Field:   "new_password",
+			Code:    "PASSWORD_TOO_WEAK",
+			Message: fmt.Sprintf("Password is too weak (score: %d/%d). Please use a stronger password with a mix of characters.", strength.Score, 4),
+		}
 	}
 
 	newHash, err := utils.HashPassword(newPassword)

@@ -27,7 +27,7 @@ func NewHandler(svc *Service, log *zap.Logger) *Handler {
 
 type registerRequest struct {
 	Email     string `json:"email"      validate:"required,email,max=255"`
-	Password  string `json:"password"   validate:"required,min=8,max=72"`
+	Password  string `json:"password"   validate:"required,min=10,max=72"`
 	FirstName string `json:"first_name" validate:"required,max=100"`
 	LastName  string `json:"last_name"  validate:"required,max=100"`
 }
@@ -55,7 +55,7 @@ type forgotPasswordRequest struct {
 
 type resetPasswordRequest struct {
 	Token       string `json:"token"        validate:"required"`
-	NewPassword string `json:"new_password" validate:"required,min=8,max=72"`
+	NewPassword string `json:"new_password" validate:"required,min=10,max=72"`
 }
 
 // ---- Handlers ----
@@ -85,6 +85,13 @@ func (h *Handler) Register(c *gin.Context) {
 
 	user, err := h.svc.Register(req.Email, req.Password, req.FirstName, req.LastName)
 	if err != nil {
+		var validErr *ValidationError
+		if errors.As(err, &validErr) {
+			utils.BadRequest(c, validErr.Code, validErr.Message, gin.H{
+				"field": validErr.Field,
+			})
+			return
+		}
 		if errors.Is(err, ErrEmailAlreadyTaken) {
 			utils.Conflict(c, "email is already registered")
 			return
@@ -260,6 +267,13 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 	}
 
 	if err := h.svc.ResetPassword(req.Token, req.NewPassword); err != nil {
+		var validErr *ValidationError
+		if errors.As(err, &validErr) {
+			utils.BadRequest(c, validErr.Code, validErr.Message, gin.H{
+				"field": validErr.Field,
+			})
+			return
+		}
 		utils.BadRequest(c, "INVALID_TOKEN", "invalid or expired reset token", nil)
 		return
 	}
