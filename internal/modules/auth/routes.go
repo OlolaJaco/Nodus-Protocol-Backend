@@ -11,9 +11,14 @@ import (
 func RegisterRoutes(rg *gin.RouterGroup, h *Handler, sep10h *Sep10Handler, jwtManager *utils.JWTManager, rdb *redis.Client) {
 	auth := rg.Group("/auth")
 
+	authLimiterStore, err := middleware.NewLimiterStore(rdb, "nodus_rl_auth")
+	if err != nil {
+		panic("failed to initialize auth rate limiter store: " + err.Error())
+	}
+
 	// Public routes — rate-limited strictly
 	public := auth.Group("")
-	public.Use(middleware.StrictRateLimiter(20))
+	public.Use(middleware.StrictRateLimiter(authLimiterStore, 20))
 	{
 		public.POST("/register", h.Register)
 		public.POST("/login", h.Login)

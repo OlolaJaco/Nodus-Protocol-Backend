@@ -61,13 +61,18 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
+	rateLimiterStore, err := middleware.NewLimiterStore(rdb, "nodus_rl_global")
+	if err != nil {
+		log.Fatal("failed to initialize rate limiter store", zap.Error(err))
+	}
+
 	router := gin.New()
 	router.Use(
 		middleware.Recovery(),
 		middleware.SecurityHeaders(),
 		middleware.CORS(cfg),
 		middleware.RequestLogger(log),
-		middleware.RateLimiter(300),
+		middleware.RateLimiter(rateLimiterStore, 300),
 	)
 
 	router.GET("/health", func(c *gin.Context) {
